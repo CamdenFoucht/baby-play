@@ -1,0 +1,564 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="color-scheme" content="light dark" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<link rel="icon" href="data:," />
+<title>Baby Play Page</title>
+<style>
+  :root{
+    --ink:#2b2118;
+    --bar-bg:rgba(255,255,255,.72);
+    --bar-ink:#3a2e22;
+    --bar-border:rgba(60,40,20,.14);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bar-bg:rgba(20,20,28,.62);
+      --bar-ink:#f5efe6;
+      --bar-border:rgba(255,255,255,.16);
+    }
+  }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{ height:100%; }
+  body{
+    margin:0;
+    overflow:hidden;
+    overscroll-behavior:none;
+    touch-action:none;
+    -webkit-user-select:none; user-select:none;
+    -webkit-touch-callout:none;
+    font-family: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", sans-serif;
+    background:#fff6e8;
+    color:var(--ink);
+    position:fixed; inset:0;
+  }
+  #play{ position:absolute; inset:0; width:100%; height:100%; display:block; touch-action:none; }
+
+  /* ---------- grown-up controls: small, tucked in the corner ---------- */
+  .grownups{
+    position:absolute;
+    top:calc(env(safe-area-inset-top, 0px) + 10px);
+    right:calc(env(safe-area-inset-right, 0px) + 10px);
+    display:flex; gap:8px; align-items:center;
+    z-index:5;
+  }
+  .grownups .label{
+    font-size:11px; font-weight:700; letter-spacing:.04em;
+    color:var(--bar-ink); opacity:.55; margin-right:2px;
+    display:none;
+  }
+  @media (min-width:560px){ .grownups .label{ display:block; } }
+  .grownups button{
+    appearance:none; border:1px solid var(--bar-border);
+    background:var(--bar-bg);
+    -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px);
+    color:var(--bar-ink);
+    font:inherit; font-size:13px; font-weight:700;
+    min-height:40px; padding:8px 13px; border-radius:999px;
+    display:inline-flex; align-items:center; gap:7px;
+    cursor:pointer; opacity:.82;
+  }
+  .grownups button:active{ transform:scale(.96); opacity:1; }
+  .grownups button svg{ width:17px; height:17px; flex:none; }
+  .grownups button .theme-dot{ width:12px; height:12px; border-radius:50%; flex:none; border:2px solid rgba(0,0,0,.18); }
+
+  /* ---------- start overlay ---------- */
+  #start{
+    position:absolute; inset:0; z-index:10;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:18px; text-align:center; padding:28px;
+    background:
+      radial-gradient(240px 240px at 18% 20%, rgba(255,179,64,.35), transparent 70%),
+      radial-gradient(280px 280px at 84% 78%, rgba(255,122,200,.28), transparent 70%),
+      radial-gradient(220px 220px at 80% 14%, rgba(78,203,113,.25), transparent 70%),
+      #fff6e8;
+    border:0; width:100%; cursor:pointer; font:inherit; color:var(--ink);
+  }
+  @media (prefers-color-scheme: dark){
+    #start{ background:
+      radial-gradient(240px 240px at 18% 20%, rgba(255,179,64,.20), transparent 70%),
+      radial-gradient(280px 280px at 84% 78%, rgba(255,122,200,.16), transparent 70%),
+      radial-gradient(220px 220px at 80% 14%, rgba(78,203,113,.14), transparent 70%),
+      #232038; color:#f7f1e5; }
+  }
+  #start .face{ width:min(46vw,190px); height:auto; animation:bob 2.6s ease-in-out infinite; }
+  @keyframes bob{ 0%,100%{ transform:translateY(0) rotate(-2deg);} 50%{ transform:translateY(-10px) rotate(2deg);} }
+  #start h1{ margin:0; font-size:clamp(28px,7vw,42px); font-weight:800; letter-spacing:-.01em; line-height:1.08; }
+  #start p{ margin:0; font-size:clamp(15px,4vw,18px); line-height:1.5; max-width:34ch; opacity:.82; font-weight:600; }
+  #start .tap-pill{
+    margin-top:6px; background:#ff5d5d; color:#fff; font-weight:800; font-size:17px;
+    padding:14px 28px; border-radius:999px; box-shadow:0 8px 22px rgba(255,93,93,.35);
+    animation:pulse 1.8s ease-in-out infinite;
+  }
+  @keyframes pulse{ 0%,100%{ transform:scale(1);} 50%{ transform:scale(1.06);} }
+  #start .fine{ font-size:12.5px; font-weight:600; opacity:.55; max-width:38ch; line-height:1.5; }
+  #start.gone{ display:none; }
+  @media (prefers-reduced-motion: reduce){
+    #start .face, #start .tap-pill{ animation:none; }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="play" aria-label="A colourful play space. Touch, tap or swipe anywhere to make shapes and gentle sounds."></canvas>
+
+<div class="grownups" aria-label="Controls for grown-ups">
+  <span class="label">For grown-ups</span>
+  <button id="themeBtn" type="button" aria-label="Change scene">
+    <span class="theme-dot" id="themeDot" style="background:#ffb340"></span>
+    <span id="themeName">Meadow</span>
+  </button>
+  <button id="soundBtn" type="button" aria-label="Turn sound off" aria-pressed="true">
+    <svg id="soundIconOn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z" fill="currentColor" stroke="none"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.4 5.6a9 9 0 0 1 0 12.8"/></svg>
+    <svg id="soundIconOff" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:none"><path d="M11 5 6 9H3v6h3l5 4z" fill="currentColor" stroke="none"/><line x1="16" y1="9" x2="22" y2="15"/><line x1="22" y1="9" x2="16" y2="15"/></svg>
+    <span>Sound</span>
+  </button>
+</div>
+
+<button id="start" type="button" aria-label="Start playing">
+  <svg class="face" viewBox="0 0 200 200" aria-hidden="true">
+    <g>
+      <g stroke="#ffb340" stroke-width="10" stroke-linecap="round">
+        <line x1="100" y1="6" x2="100" y2="26"/><line x1="100" y1="174" x2="100" y2="194"/>
+        <line x1="6" y1="100" x2="26" y2="100"/><line x1="174" y1="100" x2="194" y2="100"/>
+        <line x1="34" y1="34" x2="48" y2="48"/><line x1="152" y1="152" x2="166" y2="166"/>
+        <line x1="166" y1="34" x2="152" y2="48"/><line x1="48" y1="152" x2="34" y2="166"/>
+      </g>
+      <circle cx="100" cy="100" r="62" fill="#ffd93d" stroke="#f0a832" stroke-width="5"/>
+      <circle cx="78" cy="90" r="8" fill="#2b2118"/>
+      <circle cx="122" cy="90" r="8" fill="#2b2118"/>
+      <circle cx="81" cy="87" r="3" fill="#fff"/>
+      <circle cx="125" cy="87" r="3" fill="#fff"/>
+      <path d="M74 116 Q100 140 126 116" fill="none" stroke="#2b2118" stroke-width="6" stroke-linecap="round"/>
+      <circle cx="62" cy="112" r="9" fill="#ff9d9d" opacity=".8"/>
+      <circle cx="138" cy="112" r="9" fill="#ff9d9d" opacity=".8"/>
+    </g>
+  </svg>
+  <h1>Tap to play</h1>
+  <p>Big shapes, soft sounds and lots to chase. Made for little hands that slap, swipe and grab.</p>
+  <span class="tap-pill">Start playing</span>
+  <span class="fine">Tip for grown-ups: turn on Guided Access (Settings → Accessibility) to lock her into this page, and keep the volume low — every sound here is gentle.</span>
+</button>
+
+<script>
+(function(){
+  "use strict";
+
+  var canvas = document.getElementById('play');
+  var ctx = canvas.getContext('2d');
+  var W = 0, H = 0, DPR = 1;
+
+  var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ---------------- Themes ---------------- */
+  var THEMES = [
+    { name:'Meadow', dot:'#ffb340',
+      bg:['#fff6e8','#ffe9d2'],
+      colors:['#ff5d5d','#ffb340','#ffd93d','#4ecb71','#3aa7ff','#ff7ac8'],
+      ink:'#2b2118' },
+    { name:'Bold', dot:'#111111',
+      bg:['#ffffff','#f2f2f2'],
+      colors:['#111111','#e63946','#111111','#ffffff','#e63946','#111111'],
+      ink:'#111111', bold:true },
+    { name:'Ocean', dot:'#2bb3a3',
+      bg:['#e2f7ff','#c9efff'],
+      colors:['#2bb3a3','#3aa7ff','#7ed0ff','#ffb340','#ff8a7a','#4ecb71'],
+      ink:'#173a4a' },
+    { name:'Night', dot:'#ffd93d',
+      bg:['#252547','#191930'],
+      colors:['#ffd93d','#fff3b0','#ff7ac8','#8be0ff','#b8f1cc','#ffb340'],
+      ink:'#ffffff', dark:true }
+  ];
+  var themeIdx = 0;
+
+  /* ---------------- Audio: soft pentatonic chimes ---------------- */
+  var audioCtx = null, soundOn = true;
+  var SCALE = [261.63, 293.66, 329.63, 392.00, 440.00, 523.25, 587.33, 659.25]; // C major pentatonic
+  var noteIdx = Math.floor(Math.random() * SCALE.length);
+  var lastTrailNote = 0;
+
+  function ensureAudio(){
+    if (!audioCtx){
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (AC){ try { audioCtx = new AC(); } catch(e){ audioCtx = null; } }
+    }
+    if (audioCtx && audioCtx.state === 'suspended'){ audioCtx.resume(); }
+  }
+  function playNote(freq, vol, dur){
+    if (!soundOn || !audioCtx) return;
+    try {
+      var t = audioCtx.currentTime;
+      var osc = audioCtx.createOscillator();
+      var osc2 = audioCtx.createOscillator();
+      var gain = audioCtx.createGain();
+      osc.type = 'sine'; osc.frequency.value = freq;
+      osc2.type = 'triangle'; osc2.frequency.value = freq * 2;
+      var g2 = audioCtx.createGain(); g2.gain.value = 0.25;
+      gain.gain.setValueAtTime(0.0001, t);
+      gain.gain.exponentialRampToValueAtTime(vol, t + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      osc.connect(gain); osc2.connect(g2); g2.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(t); osc2.start(t);
+      osc.stop(t + dur + 0.05); osc2.stop(t + dur + 0.05);
+    } catch(e){}
+  }
+  function nextNote(){
+    // wander up and down the scale so it always sounds like a little tune
+    noteIdx += (Math.random() < 0.5 ? -1 : 1) * (Math.random() < 0.25 ? 2 : 1);
+    if (noteIdx < 0) noteIdx = 1;
+    if (noteIdx >= SCALE.length) noteIdx = SCALE.length - 2;
+    return SCALE[noteIdx];
+  }
+  function popSound(){
+    if (!soundOn || !audioCtx) return;
+    try {
+      var t = audioCtx.currentTime;
+      var osc = audioCtx.createOscillator();
+      var gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(520, t);
+      osc.frequency.exponentialRampToValueAtTime(180, t + 0.12);
+      gain.gain.setValueAtTime(0.12, t);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
+      osc.connect(gain); gain.connect(audioCtx.destination);
+      osc.start(t); osc.stop(t + 0.16);
+    } catch(e){}
+  }
+
+  /* ---------------- Drawing shapes ---------------- */
+  function drawStar(cx, cy, r, color){
+    ctx.beginPath();
+    for (var i = 0; i < 10; i++){
+      var rad = (i % 2 === 0) ? r : r * 0.48;
+      var a = (Math.PI / 5) * i - Math.PI / 2;
+      var x = cx + Math.cos(a) * rad, y = cy + Math.sin(a) * rad;
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.closePath(); ctx.fillStyle = color; ctx.fill();
+  }
+  function drawHeart(cx, cy, r, color){
+    ctx.beginPath();
+    ctx.moveTo(cx, cy + r * 0.85);
+    ctx.bezierCurveTo(cx - r * 1.25, cy + r * 0.05, cx - r * 0.72, cy - r * 0.95, cx, cy - r * 0.32);
+    ctx.bezierCurveTo(cx + r * 0.72, cy - r * 0.95, cx + r * 1.25, cy + r * 0.05, cx, cy + r * 0.85);
+    ctx.closePath(); ctx.fillStyle = color; ctx.fill();
+  }
+  function drawFlower(cx, cy, r, color){
+    ctx.fillStyle = color;
+    for (var i = 0; i < 6; i++){
+      var a = (Math.PI * 2 / 6) * i;
+      ctx.beginPath();
+      ctx.arc(cx + Math.cos(a) * r * 0.58, cy + Math.sin(a) * r * 0.58, r * 0.46, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.beginPath(); ctx.arc(cx, cy, r * 0.4, 0, Math.PI * 2);
+    ctx.fillStyle = '#fff8e6'; ctx.fill();
+  }
+  function drawFace(cx, cy, r, color, ink){
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fillStyle = color; ctx.fill();
+    ctx.beginPath(); ctx.arc(cx - r * 0.36, cy - r * 0.16, r * 0.11, 0, Math.PI * 2);
+    ctx.arc(cx + r * 0.36, cy - r * 0.16, r * 0.11, 0, Math.PI * 2);
+    ctx.fillStyle = ink; ctx.fill();
+    ctx.beginPath();
+    ctx.arc(cx, cy + r * 0.08, r * 0.46, Math.PI * 0.15, Math.PI * 0.85);
+    ctx.strokeStyle = ink; ctx.lineWidth = Math.max(3, r * 0.09); ctx.lineCap = 'round';
+    ctx.stroke();
+  }
+  function drawShape(kind, x, y, r, color, ink, alpha){
+    ctx.save();
+    ctx.globalAlpha = alpha == null ? 1 : alpha;
+    if (kind === 0){ ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill(); }
+    else if (kind === 1){ drawStar(x, y, r, color); }
+    else if (kind === 2){ drawHeart(x, y, r, color); }
+    else if (kind === 3){ drawFlower(x, y, r, color); }
+    else if (kind === 4){ drawFace(x, y, r, color, ink); }
+    else { // bubble ring
+      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.strokeStyle = color; ctx.lineWidth = Math.max(3, r * 0.16); ctx.stroke();
+      ctx.beginPath(); ctx.arc(x - r * 0.32, y - r * 0.34, r * 0.18, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255,255,255,.75)'; ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  /* ---------------- Scene: floaters, bursts, trails, ripples ---------------- */
+  var floaters = [], particles = [], ripples = [], trails = [];
+  var running = false, started = false;
+
+  function theme(){ return THEMES[themeIdx]; }
+  function pick(arr){ return arr[Math.floor(Math.random() * arr.length)]; }
+
+  function newFloater(edge){
+    var t = theme();
+    var r = 34 + Math.random() * 34; // big, baby-sized targets
+    var f = {
+      kind: Math.random() < 0.28 ? 4 : Math.floor(Math.random() * 6),
+      color: pick(t.colors),
+      r: r,
+      x: Math.random() * W,
+      y: Math.random() * H,
+      vx: (Math.random() - 0.5) * (reduced ? 9 : 22),
+      vy: (Math.random() - 0.5) * (reduced ? 7 : 16),
+      phase: Math.random() * Math.PI * 2,
+      wobble: 0, scale: 1
+    };
+    if (edge){
+      if (Math.random() < 0.5){ f.x = Math.random() < 0.5 ? -r : W + r; f.vx = f.x < 0 ? Math.abs(f.vx) + 8 : -Math.abs(f.vx) - 8; }
+      else { f.y = Math.random() < 0.5 ? -r : H + r; f.vy = f.y < 0 ? Math.abs(f.vy) + 6 : -Math.abs(f.vy) - 6; }
+    }
+    // keep clear of the grown-up buttons (top right)
+    if (f.y < 76 && f.x > W - 240){ f.y = 110 + Math.random() * 80; }
+    return f;
+  }
+  function seedFloaters(){
+    floaters = [];
+    var n = W < 480 ? 5 : 7;
+    for (var i = 0; i < n; i++) floaters.push(newFloater(false));
+  }
+
+  function burst(x, y, big){
+    var t = theme();
+    var count = big ? (reduced ? 10 : 18) : (reduced ? 6 : 10);
+    for (var i = 0; i < count; i++){
+      var a = Math.random() * Math.PI * 2;
+      var sp = 40 + Math.random() * (big ? 190 : 120);
+      particles.push({
+        kind: Math.floor(Math.random() * 6),
+        color: pick(t.colors),
+        x: x, y: y,
+        vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 26,
+        r: 9 + Math.random() * 17,
+        rot: Math.random() * Math.PI * 2,
+        vr: (Math.random() - 0.5) * 3,
+        life: 1, decay: 0.55 + Math.random() * 0.4
+      });
+    }
+    ripples.push({ x: x, y: y, r: 8, max: big ? 130 : 84, alpha: 0.55, color: pick(t.colors) });
+  }
+
+  function addTrail(x, y){
+    trails.push({ x: x, y: y, r: 7 + Math.random() * 10, color: pick(theme().colors), life: 1, kind: Math.random() < 0.3 ? 1 : 0 });
+    if (trails.length > 90) trails.splice(0, trails.length - 90);
+  }
+
+  /* ---------------- Main loop ---------------- */
+  var lastT = 0;
+  function frame(ts){
+    if (!running) return;
+    var dt = Math.min(0.05, (ts - lastT) / 1000 || 0.016);
+    lastT = ts;
+    var t = theme();
+
+    // background
+    var g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, t.bg[0]); g.addColorStop(1, t.bg[1]);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+
+    // ripples
+    for (var i = ripples.length - 1; i >= 0; i--){
+      var rp = ripples[i];
+      rp.r += dt * 190; rp.alpha -= dt * 0.9;
+      if (rp.alpha <= 0 || rp.r > rp.max){ ripples.splice(i, 1); continue; }
+      ctx.beginPath(); ctx.arc(rp.x, rp.y, rp.r, 0, Math.PI * 2);
+      ctx.strokeStyle = rp.color; ctx.globalAlpha = Math.max(0, rp.alpha);
+      ctx.lineWidth = 6; ctx.stroke(); ctx.globalAlpha = 1;
+    }
+
+    // trails
+    for (var j = trails.length - 1; j >= 0; j--){
+      var tr = trails[j];
+      tr.life -= dt * 0.85; tr.r += dt * 14;
+      if (tr.life <= 0){ trails.splice(j, 1); continue; }
+      drawShape(tr.kind, tr.x, tr.y, tr.r, tr.color, t.ink, tr.life * 0.8);
+    }
+
+    // floaters
+    var time = ts / 1000;
+    for (var k = 0; k < floaters.length; k++){
+      var f = floaters[k];
+      f.x += f.vx * dt; f.y += f.vy * dt + Math.sin(time * 1.4 + f.phase) * 9 * dt;
+      if (f.wobble > 0){ f.wobble -= dt * 5; }
+      var target = f.wobble > 0 ? 1 + Math.sin(f.wobble * 22) * 0.10 * f.wobble : 1;
+      f.scale += (target - f.scale) * 0.35;
+      if (f.x < -f.r - 30) f.x = W + f.r + 20;
+      if (f.x > W + f.r + 30) f.x = -f.r - 20;
+      if (f.y < -f.r - 30) f.y = H + f.r + 20;
+      if (f.y > H + f.r + 30) f.y = -f.r - 20;
+      ctx.save();
+      ctx.translate(f.x, f.y);
+      ctx.scale(f.scale, f.scale);
+      ctx.translate(-f.x, -f.y);
+      drawShape(f.kind, f.x, f.y, f.r, f.color, t.bold ? (f.color === '#ffffff' ? '#111111' : '#ffffff') : '#2b2118', 1);
+      if (t.bold){
+        ctx.beginPath(); ctx.arc(f.x, f.y, f.r, 0, Math.PI * 2);
+        ctx.strokeStyle = '#111111'; ctx.lineWidth = 4; ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    // particles
+    for (var m = particles.length - 1; m >= 0; m--){
+      var p = particles[m];
+      p.life -= dt * p.decay;
+      if (p.life <= 0){ particles.splice(m, 1); continue; }
+      p.vy += 130 * dt; // gentle gravity
+      p.x += p.vx * dt; p.y += p.vy * dt; p.rot += p.vr * dt;
+      ctx.save();
+      ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.translate(-p.x, -p.y);
+      drawShape(p.kind, p.x, p.y, p.r * (0.5 + p.life * 0.5), p.color, t.ink, Math.min(1, p.life * 1.4));
+      ctx.restore();
+    }
+
+    requestAnimationFrame(frame);
+  }
+
+  /* ---------------- Touch / pointer handling ---------------- */
+  var pointers = {};
+  var lastTrailAt = {};
+
+  function hitFloater(x, y){
+    for (var i = floaters.length - 1; i >= 0; i--){
+      var f = floaters[i];
+      var dx = x - f.x, dy = y - f.y;
+      if (dx * dx + dy * dy <= (f.r + 14) * (f.r + 14)) return f;
+    }
+    return null;
+  }
+
+  function onDown(x, y, id){
+    ensureAudio();
+    var f = hitFloater(x, y);
+    if (f){
+      f.wobble = 1;
+      burst(x, y, true);
+      playNote(nextNote() * 1.5, 0.14, 0.9);
+      popSound();
+      if (Math.random() < 0.35){
+        // occasionally the shape pops away and a new friend drifts in
+        var idx = floaters.indexOf(f);
+        if (idx >= 0) floaters.splice(idx, 1);
+        setTimeout(function(){ if (started) floaters.push(newFloater(true)); }, 650);
+      }
+    } else {
+      burst(x, y, false);
+      playNote(nextNote(), 0.12, 0.8);
+    }
+    if (navigator.vibrate) { try { navigator.vibrate(8); } catch(e){} }
+    pointers[id] = { x: x, y: y };
+    lastTrailAt[id] = 0;
+  }
+
+  function onMove(x, y, id){
+    var prev = pointers[id];
+    if (!prev) return;
+    var dx = x - prev.x, dy = y - prev.y;
+    var dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist > 14){
+      addTrail(x, y);
+      pointers[id] = { x: x, y: y };
+      var now = performance.now();
+      if (now - (lastTrailAt[id] || 0) > 150){
+        lastTrailAt[id] = now;
+        playNote(nextNote(), 0.05, 0.45);
+        // swiping across a floater tickles it
+        var f = hitFloater(x, y);
+        if (f && f.wobble <= 0){ f.wobble = 1; popSound(); }
+      }
+    }
+  }
+
+  function onUp(id){ delete pointers[id]; delete lastTrailAt[id]; }
+
+  canvas.addEventListener('pointerdown', function(e){
+    e.preventDefault();
+    try { if (canvas.setPointerCapture && e.pointerId != null) canvas.setPointerCapture(e.pointerId); } catch(err){}
+    onDown(e.clientX, e.clientY, e.pointerId);
+  }, { passive:false });
+  canvas.addEventListener('pointermove', function(e){
+    e.preventDefault();
+    onMove(e.clientX, e.clientY, e.pointerId);
+  }, { passive:false });
+  canvas.addEventListener('pointerup', function(e){ onUp(e.pointerId); });
+  canvas.addEventListener('pointercancel', function(e){ onUp(e.pointerId); });
+
+  // stop iOS double-tap zoom / scroll gestures on the page itself
+  document.addEventListener('touchmove', function(e){ e.preventDefault(); }, { passive:false });
+  document.addEventListener('gesturestart', function(e){ e.preventDefault(); });
+  document.addEventListener('dblclick', function(e){ e.preventDefault(); });
+
+  /* ---------------- Resize ---------------- */
+  function resize(){
+    DPR = Math.min(2, window.devicePixelRatio || 1);
+    W = window.innerWidth; H = window.innerHeight;
+    canvas.width = Math.round(W * DPR);
+    canvas.height = Math.round(H * DPR);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    if (started && floaters.length === 0) seedFloaters();
+  }
+  window.addEventListener('resize', resize);
+  window.addEventListener('orientationchange', function(){ setTimeout(resize, 120); });
+  resize();
+
+  /* ---------------- Start ---------------- */
+  var wakeLock = null;
+  function askWakeLock(){
+    if ('wakeLock' in navigator){
+      navigator.wakeLock.request('screen').then(function(wl){ wakeLock = wl; }).catch(function(){});
+    }
+  }
+  document.addEventListener('visibilitychange', function(){
+    if (document.visibilityState === 'visible' && started) askWakeLock();
+  });
+
+  var startBtn = document.getElementById('start');
+  startBtn.addEventListener('click', function(){
+    ensureAudio();
+    started = true;
+    startBtn.classList.add('gone');
+    seedFloaters();
+    running = true;
+    lastT = performance.now();
+    requestAnimationFrame(frame);
+    askWakeLock();
+    // a welcoming little burst in the middle
+    setTimeout(function(){ burst(W / 2, H / 2, true); playNote(SCALE[4], 0.12, 0.9); }, 120);
+  });
+
+  /* ---------------- Grown-up controls ---------------- */
+  var themeBtn = document.getElementById('themeBtn');
+  var themeName = document.getElementById('themeName');
+  var themeDot = document.getElementById('themeDot');
+  themeBtn.addEventListener('click', function(e){
+    e.stopPropagation();
+    themeIdx = (themeIdx + 1) % THEMES.length;
+    var t = theme();
+    themeName.textContent = t.name;
+    themeDot.style.background = t.dot;
+    seedFloaters();
+    particles = []; trails = [];
+  });
+  themeBtn.addEventListener('pointerdown', function(e){ e.stopPropagation(); });
+
+  var soundBtn = document.getElementById('soundBtn');
+  var iconOn = document.getElementById('soundIconOn');
+  var iconOff = document.getElementById('soundIconOff');
+  soundBtn.addEventListener('click', function(e){
+    e.stopPropagation();
+    soundOn = !soundOn;
+    iconOn.style.display = soundOn ? '' : 'none';
+    iconOff.style.display = soundOn ? 'none' : '';
+    soundBtn.setAttribute('aria-pressed', soundOn ? 'true' : 'false');
+    soundBtn.setAttribute('aria-label', soundOn ? 'Turn sound off' : 'Turn sound on');
+    if (soundOn){ ensureAudio(); playNote(SCALE[4], 0.1, 0.6); }
+  });
+  soundBtn.addEventListener('pointerdown', function(e){ e.stopPropagation(); });
+})();
+</script>
+</body>
+</html>
